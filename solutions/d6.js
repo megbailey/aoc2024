@@ -1,6 +1,11 @@
 
 const fs = require('fs');
 
+
+String.prototype.replaceAt = function(index, str) {
+    return this.substring(0, index) + str + this.substring(index + str.length);
+}
+
 function countMatches(str, sub) {
     if (str.length === 0 || sub.length === 0) {
         return 0;
@@ -27,65 +32,150 @@ function turnRight( direction ) {
     }
 }
 
-String.prototype.replaceAt = function(index, str) {
-    return this.substring(0, index) + str + this.substring(index + str.length);
+
+function mapLoop( map, currPositionX, currPositionY, forEach = null) {
+    let char_in_map = true;
+    let currDirection = '^'
+
+    while ( char_in_map ) {
+
+        if ( !map[ currPositionY ] || !map[ currPositionY ][ currPositionX ] ) {
+            char_in_map = false;
+            break;
+        }
+       
+        if ( typeof forEach === 'function' ) {
+            let loopFound = forEach(currDirection, currPositionX, currPositionY, map)
+            if ( loopFound === true ) {
+                break;
+            }
+        }
+   
+        // no obstacle, proceed forward
+        if ( currDirection === '^' && !['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            if ( map[ currPositionY ][ currPositionX ] === '-' ){
+                // crossing direction
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '+')
+            } else if (  map[ currPositionY ][ currPositionX ] === '.' ) {
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '|')
+            }
+            currPositionY -= 1;
+        } else if ( currDirection === '>' && !['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] )) {
+            if ( map[ currPositionY ][ currPositionX ] === '|' ) {
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '+')
+            } else if (  map[ currPositionY ][ currPositionX ] === '.' ) {
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '-')
+            }            
+            currPositionX += 1;
+        } else if ( currDirection === 'v' && !['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            if ( map[ currPositionY ][ currPositionX ] === '-' ) {
+                // crossing
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '+')
+            } else if (  map[ currPositionY ][ currPositionX ] === '.' ) {
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '|')
+            }            
+            currPositionY += 1;
+        } else if ( currDirection === '<' && !['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            if ( map[ currPositionY ][ currPositionX ] === '|' ) {
+                // crossing
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '+')
+            } else if (  map[ currPositionY ][ currPositionX ] === '.' ) {
+                map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, '-')
+            }      
+            currPositionX -= 1;
+        }
+        // obstacle found, turn right
+        else if ( currDirection === '^' && ['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            currPositionY += 1;
+            currDirection = turnRight(currDirection)
+        } else if ( currDirection === '>' && ['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            currPositionX -= 1;
+            currDirection = turnRight(currDirection)
+        } else if ( currDirection === 'v' && ['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            currPositionY -= 1;
+            currDirection = turnRight(currDirection)
+        } else if ( currDirection === '<' && ['#' , 'O'].includes( map[ currPositionY ][ currPositionX ] ) ) {
+            currPositionX += 1;
+            currDirection = turnRight(currDirection)
+        }
+
+        //console.log( JSON.stringify(map, null, '\t') )
+    }
+    
 }
+
 
 const inputFile = fs.readFileSync('./inputs/inputd6.txt',  { encoding: 'utf8', flag: 'r' })
 
 let map = []
-let currPositionX;
-let currPositionY;
+let startPositionX;
+let startPositionY;
+let obstacles = []
+
+// Create map and find starting position
 inputFile.split('\n').forEach(( line, index ) => {
     map.push( line )
     if ( line.indexOf('^') !== -1 ) {
-        currPositionX = line.indexOf('^');
-        currPositionY = index;
+        startPositionX = line.indexOf('^');
+        startPositionY = index;
+    }
+    let obIndex;
+    // find coordinates of all obstacles in line
+    while ((obIndex = line.indexOf('#', obIndex)) != -1) {
+        obIndex += 1;
+        obstacles.push([ obIndex, index ])
     }
 })
 
+let freshMap = JSON.parse( JSON.stringify(map) )
 
-let char_in_map = true;
-let currDirection = '^'
-while ( char_in_map ) {
-
-    // no obstacle
-    if ( currDirection === '^' && ( currPositionY-1 < 0 || map[ currPositionY-1 ][ currPositionX ] !== '#' )) {
-        map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, 'X')
-        currPositionY -= 1;
-    } else if ( currDirection === '>' && ( currPositionX+1 >= map[0].length || map[ currPositionY ][ currPositionX+1 ] !== '#' )) {
-        map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, 'X')
-        currPositionX += 1;
-    } else if ( currDirection === 'v' && ( currPositionY+1 >= map.length || map[ currPositionY+1 ][ currPositionX ] !== '#' )) {
-        map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, 'X')
-        currPositionY += 1;
-    } else if ( currDirection === '<' && ( currPositionX-1 < 0 || map[ currPositionY ][ currPositionX-1 ] !== '#' )) {
-        map[ currPositionY ] = map[ currPositionY ].replaceAt(currPositionX, 'X')
-        currPositionX -= 1;
+// find places for potiential obstacle loops
+let potientialObstacleLoops = { }
+mapLoop(map, startPositionX, startPositionY, (currDir, currX, currY) => {
+    let sameX = obstacles.filter( coords => currX === coords[0] )
+    let sameY = obstacles.filter( coords => currY === coords[1] )
+    if (( sameX.length > 0 || sameY.length > 0 ) && map[currY][currX] !== '#') {
+        potientialObstacleLoops[[currX, currY]] = [currX, currY]
     }
-    // obstacle found
-    else if ( currDirection === '^' && map[ currPositionY-1 ] && map[ currPositionY-1 ][ currPositionX ] === '#' ) {
-        currDirection = turnRight(currDirection)
-    } else if ( currDirection === '>' && map[ currPositionY ][ currPositionX+1 ] && map[ currPositionY ][ currPositionX+1 ] === '#' ) {
-        currDirection = turnRight(currDirection)
-    } else if ( currDirection === 'v' && map[ currPositionY+1 ] && map[ currPositionY+1 ][ currPositionX ] === '#' ) {
-        currDirection = turnRight(currDirection)
-    } else if ( currDirection === '<' && map[ currPositionY ][ currPositionX-1 ] && map[ currPositionY ][ currPositionX-1 ] === '#' ) {
-        currDirection = turnRight(currDirection)
-    }
- 
-    if ( currPositionX >= map[0].length || currPositionX < 0 )
-        char_in_map = false;
-    else if ( currPositionY >= map.length || currPositionY < 0 )
-        char_in_map = false;
+})
 
-}
+// only unique position
+// Prepare maps to test
+let trialMaps = [ ]
+Object.entries(potientialObstacleLoops).forEach(( potientialObstacle ) => {
+    const x = potientialObstacle[1][0]
+    const y = potientialObstacle[1][1]
+    // deep copy map to change
+    let maybeMap = JSON.parse( JSON.stringify(freshMap) )
+    // place obstacle
+    maybeMap[ y ] = maybeMap[ y ].replaceAt(x, 'O')
+    trialMaps.push(maybeMap)
+})
 
+let confirmedLoops = [ ]
 
-let distinctPositions = 0;
+trialMaps.forEach(( attempt, index ) => {
+    let encounteredObstacles = { }
+    console.log( `attempt, ${index}` )
+    mapLoop(attempt, startPositionX, startPositionY, (currDirection, currX, currY, currMap) => {
+        if ( ['#' , 'O'].includes( currMap[ currY ][ currX ] )) {
+            const key = `${currX},${currY},${currDirection}`
+            // loop found when we encounter the same obstacle in the same direction
+            if ( encounteredObstacles[ key ]) {
+                confirmedLoops.push(currMap)
+                return true;
+            }
+            encounteredObstacles[ key ] = [ currX, currY]
+        }
+      
+    })
+})
+
+// S1
+/* let distinctPositions = 0;
 map.forEach(line => {
     distinctPositions += countMatches(line, 'X')
-});
+}); */
 
-console.log(map, distinctPositions)
 
+console.log( confirmedLoops.length)
